@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RCD · Región de Los Lagos · Presentación GEF</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root{
+  --navy:  #0c1f3c;
+  --blue:  #1456a0;
+  --sky:   #3b8fd4;
+  --alert: #c94200;
+  --amber: #c07a00;
+  --green: #1a7a48;
+  --red:   #b01828;
+  --light: #f8fafb;
+  --line:  #dce4ee;
+  --text:  #182a40;
+  --muted: #7a90a8;
+  --white: #ffffff;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:'Barlow',sans-serif;background:var(--light);color:var(--text)}
+#wrap{display:flex;flex-direction:column;height:100vh}
+
+/* ── HEADER ── */
+#hdr{
+  height:48px;flex-shrink:0;background:var(--white);
+  border-bottom:1px solid var(--line);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 20px;
+}
+.hdr-left{display:flex;align-items:center;gap:14px}
+.hdr-sep{width:1px;height:22px;background:var(--line)}
+.hdr-title{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;
+  color:var(--navy);letter-spacing:.2px}
+.hdr-sub{font-size:11px;color:var(--muted)}
+.hdr-badge{
+  font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;
+  letter-spacing:.8px;text-transform:uppercase;
+  background:var(--navy);color:#fff;padding:4px 12px;border-radius:3px
+}
+
+/* ── BODY ── */
+#body{display:flex;flex:1;overflow:hidden}
+#map{flex:1}
+
+/* ── PANEL LATERAL DERECHO ── */
+#panel{
+  width:320px;flex-shrink:0;
+  background:var(--white);border-left:1px solid var(--line);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+
+/* Paso actual — número grande */
+#step-hdr{
+  padding:20px 22px 16px;border-bottom:1px solid var(--line);
+  background:var(--light);flex-shrink:0;
+}
+.step-num{
+  font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;
+  letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;
+  display:flex;align-items:center;gap:8px;
+}
+.step-num-dots{display:flex;gap:5px}
+.sdot{width:8px;height:8px;border-radius:50%;background:var(--line);transition:all .3s}
+.sdot.done{background:var(--sky)}
+.sdot.active{background:var(--alert);transform:scale(1.2)}
+.step-title{font-family:'Barlow Condensed',sans-serif;font-size:21px;font-weight:700;
+  color:var(--navy);line-height:1.2}
+
+/* Contenido narrativo */
+#step-body{
+  flex:1;overflow-y:auto;padding:18px 22px;
+  display:flex;flex-direction:column;gap:14px;
+}
+#step-body::-webkit-scrollbar{width:3px}
+#step-body::-webkit-scrollbar-thumb{background:var(--line);border-radius:2px}
+#step-desc{font-size:13px;color:#3a5470;line-height:1.6}
+#step-desc strong{color:var(--navy)}
+
+/* Leyenda */
+#step-legend{display:flex;flex-direction:column;gap:7px}
+.leg-row{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--text)}
+.lsym{width:14px;height:14px;flex-shrink:0;border-radius:3px}
+.lcirc{width:13px;height:13px;border-radius:50%;flex-shrink:0}
+.lnote{font-size:10.5px;color:var(--muted);font-style:italic;padding-top:2px;line-height:1.4}
+
+/* Nota de fuente */
+.src-note{
+  font-size:10px;color:var(--muted);line-height:1.5;
+  padding:9px 11px;background:var(--light);border-radius:4px;
+  border-left:3px solid var(--line);
+}
+
+/* ── NAVEGACIÓN ── */
+#step-nav{
+  flex-shrink:0;border-top:1px solid var(--line);
+  padding:14px 22px;display:flex;align-items:center;gap:10px;background:var(--white)
+}
+.btn-p,.btn-n{
+  border:none;cursor:pointer;border-radius:5px;
+  font-family:'Barlow Condensed',sans-serif;font-weight:700;
+  font-size:13px;letter-spacing:.4px;transition:all .15s;padding:9px 18px;
+}
+.btn-p{background:var(--light);color:var(--muted);border:1px solid var(--line)}
+.btn-p:hover:not(:disabled){background:#eaeff5;color:var(--text)}
+.btn-p:disabled{opacity:.35;cursor:default}
+.btn-n{background:var(--navy);color:#fff;flex:1}
+.btn-n:hover{background:#162e56}
+.btn-r{background:var(--green);color:#fff;flex:1}
+.btn-r:hover{background:#156038}
+
+/* Fade in */
+@keyframes fadeUp{
+  from{opacity:0;transform:translateY(6px)}
+  to  {opacity:1;transform:translateY(0)}
+}
+.fade{animation:fadeUp .35s ease forwards}
+
+/* ── Leaflet ── */
+.leaflet-popup-content-wrapper{
+  background:#fff!important;border:1.5px solid var(--navy)!important;
+  border-radius:7px!important;box-shadow:0 4px 18px rgba(12,31,60,.15)!important}
+.leaflet-popup-tip{background:#fff!important}
+.leaflet-popup-content{font-size:12px;line-height:1.55;min-width:190px;padding:2px}
+.pp-t{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;
+  color:var(--navy);margin-bottom:2px}
+.pp-s{font-size:10px;color:var(--muted);margin-bottom:8px}
+.pp-tag{display:inline-block;padding:3px 9px;border-radius:3px;font-size:10.5px;
+  font-weight:600;border-left:3px solid;margin-bottom:6px}
+.pp-b{font-size:11px;color:#3a5470;line-height:1.55}
+.pp-n{margin-top:7px;padding:5px 8px;background:#fffbec;border-radius:4px;
+  font-size:10px;color:#806020;border-left:3px solid #e8c040;line-height:1.4}
+.leaflet-control-zoom a{background:#fff!important;color:var(--navy)!important;
+  border-color:var(--line)!important;font-weight:700!important}
+.leaflet-bar{border-color:var(--line)!important}
+.leaflet-tooltip{background:var(--navy)!important;color:#fff!important;
+  border:none!important;border-radius:4px!important;
+  font-family:'Barlow Condensed',sans-serif!important;font-size:11px!important;
+  font-weight:600!important;padding:4px 9px!important}
+.leaflet-tooltip-right::before{border-right-color:var(--navy)!important}
+.leaflet-tooltip-top::before{border-top-color:var(--navy)!important}
+.nota-pie{background:rgba(255,255,255,.92);border:1px solid var(--line);
+  border-radius:4px;padding:5px 10px;font-size:9px;color:var(--muted);
+  line-height:1.5;max-width:380px;pointer-events:none;
+  font-family:'Barlow',sans-serif}
+</style>
+</head>
+<body>
+<div id="wrap">
+
+<!-- HEADER -->
+<div id="hdr">
+  <div class="hdr-left">
+    <div class="hdr-title">Gestión de RCD · Región de Los Lagos</div>
+    <div class="hdr-sep"></div>
+    <div class="hdr-sub">Proyecto Entorno más Circular (GEF) · Fundación Chile / MMA</div>
+  </div>
+  <div class="hdr-badge">Presentación institucional</div>
+</div>
+
+<div id="body">
+
+  <!-- MAPA -->
+  <div id="map"></div>
+
+  <!-- PANEL -->
+  <div id="panel">
+
+    <div id="step-hdr">
+      <div class="step-num">
+        <div class="step-num-dots">
+          <div class="sdot active" id="d0"></div>
+          <div class="sdot" id="d1"></div>
+          <div class="sdot" id="d2"></div>
+          <div class="sdot" id="d3"></div>
+        </div>
+        <span id="step-label">Paso 1 de 4</span>
+      </div>
+      <div class="step-title" id="step-title">La región y sus provincias</div>
+    </div>
+
+    <div id="step-body">
+      <div id="step-desc"></div>
+      <div id="step-legend"></div>
+      <div id="step-src" class="src-note" style="display:none"></div>
+    </div>
+
+    <div id="step-nav">
+      <button class="btn-p" id="btn-prev" onclick="prev()" disabled>← Anterior</button>
+      <button class="btn-n" id="btn-next" onclick="next()">Siguiente →</button>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<script>
+// ── MAPA BASE ──────────────────────────────────────────────────
+const map = L.map('map',{center:[-41.9,-72.9],zoom:7,zoomControl:false});
+L.control.zoom({position:'bottomright'}).addTo(map);
+L.control.scale({imperial:false,metric:true,position:'bottomright'}).addTo(map);
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{
+  attribution:'© <a href="https://www.openstreetmap.org">OpenStreetMap</a> © CARTO',
+  maxZoom:18
+}).addTo(map);
+
+// ── PROVINCIAS ─────────────────────────────────────────────────
+// Datos verificados · Límites esquemáticos (referencia BCN)
+const PROVS = [
+  {
+    id:'Llanquihue', comunas:9,
+    fill:'#c8dff5', border:'#1456a0', dash:null,
+    label:[-41.08,-73.12], anchor:[40,10],
+    lcolor:'#1456a0', lbg:'rgba(240,247,255,0.92)',
+    tagBg:'#e8f2fb', tagColor:'#1456a0', tagBorder:'#1456a0',
+    tagText:'Provincia piloto · Datos DOM en análisis',
+    desc:'9 comunas. Metodología de generación RCD validada (GORE Los Lagos / CChC 2023). CTI La Laja como referente de modelo asociativo.',
+    comunas_lista:'Calbuco · Cochamó · Fresia · Frutillar · Los Muermos · Llanquihue · Maullín · Puerto Montt · Puerto Varas',
+    coords:[[-40.82,-73.65],[-40.82,-71.75],[-42.20,-71.75],[-42.20,-73.40],[-41.80,-73.65],[-40.82,-73.65]]
+  },
+  {
+    id:'Osorno', comunas:7,
+    fill:'#f5c8c8', border:'#b01828', dash:null,
+    label:[-40.00,-72.68], anchor:[32,10],
+    lcolor:'#b01828', lbg:'rgba(255,242,242,0.92)',
+    tagBg:'#fde8e8', tagColor:'#900018', tagBorder:'#b01828',
+    tagText:'Urgente · Vertedero Curaco colapsado',
+    desc:'7 comunas. Vertedero Curaco saturado (habilitado 1987), con orden de cierre pendiente. Acuerdo SUBDERE firmado para nuevo CTI. Pendiente datos DOM.',
+    comunas_lista:'Osorno · Puerto Octay · Purranque · Puyehue · Río Negro · San Juan de la Costa · San Pablo',
+    coords:[[-39.55,-73.60],[-39.55,-71.75],[-40.82,-71.75],[-40.82,-73.05],[-40.50,-73.60],[-39.55,-73.60]]
+  },
+  {
+    id:'Chiloé', comunas:10,
+    fill:'#f5e2b0', border:'#c07a00', dash:'7,5',
+    label:[-42.65,-73.65], anchor:[30,10],
+    lcolor:'#a06000', lbg:'rgba(255,251,235,0.92)',
+    tagBg:'#fff4e0', tagColor:'#906000', tagBorder:'#c07a00',
+    tagText:'Contexto insular · 10 vertederos precarios',
+    desc:'10 comunas. Situación insular crítica: 10 vertederos comunales precarios, todos con fiscalizaciones o planes de cierre. El ferry Pargua–Chacao condiciona cualquier solución de logística RCD. Pendiente datos DOM.',
+    comunas_lista:'Ancud · Castro · Chonchi · Curaco de Vélez · Dalcahue · Puqueldón · Queilén · Quellón · Quemchi · Quinchao',
+    coords:[[-41.78,-73.95],[-41.90,-72.90],[-42.50,-72.95],[-43.15,-73.10],[-43.55,-73.35],[-43.30,-74.55],[-42.50,-74.60],[-41.78,-73.95]]
+  },
+  {
+    id:'Palena', comunas:4,
+    fill:'#e2e4e8', border:'#8090a0', dash:'7,5',
+    label:[-43.72,-73.22], anchor:[28,10],
+    lcolor:'#607080', lbg:'rgba(245,246,248,0.92)',
+    tagBg:'#f0f2f4', tagColor:'#607080', tagBorder:'#8090a0',
+    tagText:'Remota · Acceso vial muy limitado',
+    desc:'4 comunas. Acceso por Ruta 7 (Carretera Austral). Menor generación de RCD relativa a otras provincias. Soluciones deben ser locales. Pendiente datos DOM.',
+    comunas_lista:'Chaitén · Futaleufú · Hualaihué · Palena',
+    coords:[[-42.20,-73.40],[-42.20,-71.75],[-44.80,-71.75],[-44.80,-74.30],[-43.60,-74.30],[-43.60,-73.35],[-42.20,-73.40]]
+  }
+];
+
+// ── CENTROIDES COMUNALES ───────────────────────────────────────
+// Coords aproximadas · Fuente: referencia BCN
+// No catastral — solo indican posición aprox. del centro comunal
+const COMUNAS = [
+  {n:'Puerto Montt', lat:-41.469,lon:-72.942,p:'Llanquihue'},
+  {n:'Puerto Varas', lat:-41.320,lon:-72.988,p:'Llanquihue'},
+  {n:'Llanquihue',   lat:-41.253,lon:-73.010,p:'Llanquihue'},
+  {n:'Frutillar',    lat:-41.128,lon:-73.065,p:'Llanquihue'},
+  {n:'Los Muermos',  lat:-41.395,lon:-73.473,p:'Llanquihue'},
+  {n:'Fresia',       lat:-41.080,lon:-73.420,p:'Llanquihue'},
+  {n:'Maullín',      lat:-41.618,lon:-73.592,p:'Llanquihue'},
+  {n:'Calbuco',      lat:-41.772,lon:-73.133,p:'Llanquihue'},
+  {n:'Cochamó',      lat:-41.493,lon:-72.330,p:'Llanquihue'},
+  {n:'Osorno',       lat:-40.574,lon:-73.134,p:'Osorno'},
+  {n:'Puerto Octay', lat:-40.930,lon:-72.890,p:'Osorno'},
+  {n:'Purranque',    lat:-40.910,lon:-73.180,p:'Osorno'},
+  {n:'Puyehue',      lat:-40.650,lon:-72.610,p:'Osorno'},
+  {n:'Río Negro',    lat:-40.780,lon:-72.970,p:'Osorno'},
+  {n:'San Juan de la Costa',lat:-40.392,lon:-73.450,p:'Osorno'},
+  {n:'San Pablo',    lat:-40.448,lon:-72.810,p:'Osorno'},
+  {n:'Ancud',        lat:-41.870,lon:-73.823,p:'Chiloé'},
+  {n:'Castro',       lat:-42.483,lon:-73.761,p:'Chiloé'},
+  {n:'Chonchi',      lat:-42.620,lon:-73.820,p:'Chiloé'},
+  {n:'Curaco de Vélez',lat:-42.382,lon:-73.803,p:'Chiloé'},
+  {n:'Dalcahue',     lat:-42.378,lon:-73.648,p:'Chiloé'},
+  {n:'Puqueldón',    lat:-42.710,lon:-74.010,p:'Chiloé'},
+  {n:'Queilén',      lat:-43.113,lon:-73.501,p:'Chiloé'},
+  {n:'Quellón',      lat:-43.120,lon:-73.612,p:'Chiloé'},
+  {n:'Quemchi',      lat:-42.133,lon:-73.492,p:'Chiloé'},
+  {n:'Quinchao',     lat:-42.520,lon:-73.858,p:'Chiloé'},
+  {n:'Chaitén',      lat:-42.917,lon:-72.717,p:'Palena'},
+  {n:'Futaleufú',    lat:-43.193,lon:-71.873,p:'Palena'},
+  {n:'Hualaihué',    lat:-42.003,lon:-72.423,p:'Palena'},
+  {n:'Palena',       lat:-43.618,lon:-71.783,p:'Palena'},
+];
+
+const provColors = {
+  Llanquihue:'#1456a0',
+  Osorno:'#b01828',
+  Chiloé:'#c07a00',
+  Palena:'#8090a0'
+};
+
+// ── INFRAESTRUCTURA VERIFICADA ─────────────────────────────────
+// Fuentes: SMA / SUBDERE / Asoc. Municipalidades / BioBioChile
+const INFRA = [
+  {
+    n:'CTI La Laja', lat:-41.373, lon:-72.958,
+    sub:'Km 1012, Ruta 5 Sur · Puerto Varas · Prov. Llanquihue',
+    fill:'#1a7a48', r:9,
+    tagBg:'#e8f6ee', tagColor:'#1a7a48', tagBorder:'#1a7a48',
+    tagText:'✓ Activo · En transformación a CTI',
+    desc:'Titular: Asoc. Municipalidades Llanquihue · Capacidad: ~300 ton/día RSD (SUBDERE 2016) · Galpón clasificación: 4 ton/h (mayo 2025, Asoc. Municipalidades)',
+    nota:'No gestiona RCD. Modelo asociativo a replicar. Fuente: SMA / SUBDERE / Asoc. Municipalidades Llanquihue'
+  },
+  {
+    n:'Vertedero Curaco', lat:-40.530, lon:-73.065,
+    sub:'Sector Curaco · ~7 km de Osorno · Prov. Osorno',
+    fill:'#b01828', r:8,
+    tagBg:'#fde8e8', tagColor:'#900018', tagBorder:'#b01828',
+    tagText:'⛔ Saturado · Orden de cierre pendiente',
+    desc:'Habilitado 1987 · ~540 ton/día RSD · 6 de 7 comunas de Osorno · Litigio judicial activo.',
+    nota:'No gestiona RCD. Fuente: Asoc. Municipalidades Osorno / BioBioChile 2023'
+  },
+  {
+    n:'Vertedero Ancud — Puntra El Roble', lat:-41.910, lon:-73.880,
+    sub:'Sector periurbano · Ancud · Prov. Chiloé',
+    fill:'#c07a00', r:7,
+    tagBg:'#fff4e0', tagColor:'#906000', tagBorder:'#c07a00',
+    tagText:'⚠ Precario · Orden judicial de cierre (dic. 2021)',
+    desc:'Caso más crítico del archipiélago. Chiloé tiene 10 vertederos comunales precarios. Este es representativo.',
+    nota:'No gestiona RCD. Mapa representa 1 de 10 vertederos Chiloé. Fuente: BioBioChile 2021'
+  },
+];
+
+// ── CONSTRUIR CAPAS ────────────────────────────────────────────
+const lyrProvs   = L.layerGroup();
+const lyrComunas = L.layerGroup();
+const lyrInfra   = L.layerGroup();
+const lyrVacio   = L.layerGroup();
+
+// Capa 1: Provincias
+PROVS.forEach(p => {
+  const poly = L.polygon(p.coords,{
+    fillColor:p.fill, fillOpacity:.60,
+    color:p.border, weight:2.2, dashArray:p.dash
+  });
+  poly.bindPopup(`
+    <div class="pp-t">Provincia de ${p.id}</div>
+    <div class="pp-s">${p.comunas} comunas</div>
+    <div class="pp-tag" style="background:${p.tagBg};color:${p.tagColor};border-left-color:${p.tagBorder}">${p.tagText}</div>
+    <div class="pp-b">${p.desc}</div>
+    <div class="pp-b" style="margin-top:6px;font-size:10px;color:#8a9ab0">${p.comunas_lista}</div>
+  `);
+  poly.on('mouseover',function(){this.setStyle({fillOpacity:.78})});
+  poly.on('mouseout', function(){this.setStyle({fillOpacity:.60})});
+  lyrProvs.addLayer(poly);
+
+  L.marker(p.label,{icon:L.divIcon({className:'',
+    html:`<div style="font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;
+      letter-spacing:.8px;text-transform:uppercase;color:${p.lcolor};
+      background:${p.lbg};padding:3px 9px;border-radius:3px;
+      border:1.5px solid ${p.border};white-space:nowrap;pointer-events:none;
+      box-shadow:0 1px 6px rgba(0,0,0,.10);">${p.id}</div>`,
+    iconAnchor:p.anchor
+  })}).addTo(lyrProvs);
+});
+
+// Capa 2: Comunas (centroides aproximados)
+COMUNAS.forEach(c=>{
+  const col = provColors[c.p]||'#607080';
+  L.circleMarker([c.lat,c.lon],{
+    radius:4, fillColor:col, color:'#fff', weight:1.5, fillOpacity:.85
+  })
+  .bindTooltip(`${c.n}`,{direction:'top',offset:[0,-5]})
+  .bindPopup(`
+    <div class="pp-t">${c.n}</div>
+    <div class="pp-s">Provincia de ${c.p}</div>
+    <div class="pp-n">⚠ Centroide aproximado. Límites comunales oficiales: BCN / IDE Chile.</div>
+  `)
+  .addTo(lyrComunas);
+});
+
+// Capa 3: Infraestructura
+INFRA.forEach(inf=>{
+  L.circleMarker([inf.lat,inf.lon],{
+    radius:inf.r, fillColor:inf.fill, color:'#fff', weight:2.5, fillOpacity:.95
+  })
+  .bindTooltip(inf.n,{direction:'right',offset:[10,0]})
+  .bindPopup(`
+    <div class="pp-t">${inf.n}</div>
+    <div class="pp-s">${inf.sub}</div>
+    <div class="pp-tag" style="background:${inf.tagBg};color:${inf.tagColor};border-left-color:${inf.tagBorder}">${inf.tagText}</div>
+    <div class="pp-b">${inf.desc}</div>
+    <div class="pp-n">${inf.nota}</div>
+  `)
+  .addTo(lyrInfra);
+});
+
+// Etiquetas infraestructura
+[
+  {lat:-41.355,lon:-72.955,text:'CTI La Laja',sub:'RSD · No gestiona RCD',c:'#1a7a48',bc:'#1a7a48',a:[52,26]},
+  {lat:-40.513,lon:-73.062,text:'Vertedero Curaco',sub:'Saturado · Orden cierre',c:'#900018',bc:'#b01828',a:[62,26]},
+].forEach(e=>{
+  L.marker([e.lat,e.lon],{icon:L.divIcon({className:'',
+    html:`<div style="font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;
+      color:${e.c};background:rgba(255,255,255,0.92);padding:2px 8px;border-radius:3px;
+      border:1.5px solid ${e.bc};white-space:nowrap;pointer-events:none;
+      box-shadow:0 1px 5px rgba(0,0,0,.10);">${e.text}
+      <div style="font-size:8.5px;color:${e.c};opacity:.8;font-weight:600">${e.sub}</div></div>`,
+    iconAnchor:e.a
+  })}).addTo(lyrInfra);
+});
+
+// Capa 4: Vacío RCD — iconos de alerta sobre cada provincia + indicador central limpio
+PROVS.forEach(p=>{
+  // Borde de alerta pulsante sobre cada provincia
+  L.polygon(p.coords,{
+    fillColor:'transparent', fillOpacity:0,
+    color:'#d94000', weight:3, dashArray:'6,4', opacity:.75
+  }).addTo(lyrVacio);
+
+  // Ícono ✗ sobre cada provincia
+  L.marker(p.label,{icon:L.divIcon({className:'',
+    html:`<div style="font-family:'Barlow Condensed',sans-serif;
+      background:#fff;border:2px solid #d94000;color:#d94000;
+      padding:4px 10px;border-radius:4px;font-size:11px;font-weight:700;
+      white-space:nowrap;pointer-events:none;
+      box-shadow:0 2px 8px rgba(217,64,0,.18);">
+      ✕ Sin sitios RCD
+    </div>`,
+    iconAnchor:[p.anchor[0],p.anchor[1]+28]
+  })}).addTo(lyrVacio);
+});
+
+// Indicador central limpio — sin fondo de color, solo borde
+L.marker([-41.9,-71.65],{icon:L.divIcon({className:'',
+  html:`<div style="font-family:'Barlow Condensed',sans-serif;text-align:center;
+    background:#fff;border:2.5px solid #d94000;
+    padding:14px 22px;border-radius:6px;
+    box-shadow:0 4px 20px rgba(0,0,0,.12);pointer-events:none;
+    min-width:140px;">
+    <div style="font-size:44px;font-weight:800;color:#d94000;line-height:1">0</div>
+    <div style="font-size:11.5px;font-weight:700;color:#0c1f3c;letter-spacing:.4px;margin-top:3px;line-height:1.3">SITIOS RCD<br>AUTORIZADOS</div>
+    <div style="width:100%;height:1px;background:#e8e8e8;margin:8px 0"></div>
+    <div style="font-size:9.5px;color:#7a90a8;line-height:1.4">Disposición · Transferencia<br>Valorización</div>
+  </div>`,
+  iconAnchor:[90,56]
+})}).addTo(lyrVacio);
+
+// ── PASOS ──────────────────────────────────────────────────────
+const STEPS = [
+  {
+    title: 'La región y sus provincias',
+    desc: 'El proyecto pretende <strong>beneficiar a las 4 provincias y las 30 comunas</strong> de la Región de Los Lagos. El diagnóstico parte por Llanquihue como piloto metodológico, pero el alcance territorial es regional. Cada provincia enfrenta una situación distinta frente a los RCD.',
+    legend: `
+      <div class="leg-row"><div class="lsym" style="background:#c8dff5;border:2px solid #1456a0"></div><span>Llanquihue · 9 comunas · <strong>Provincia piloto</strong></span></div>
+      <div class="leg-row"><div class="lsym" style="background:#f5c8c8;border:2px solid #b01828"></div><span>Osorno · 7 comunas · <strong>Vertedero colapsado</strong></span></div>
+      <div class="leg-row"><div class="lsym" style="background:#f5e2b0;border:2px dashed #c07a00"></div><span>Chiloé · 10 comunas · <strong>Insular, crítico</strong></span></div>
+      <div class="leg-row"><div class="lsym" style="background:#e2e4e8;border:2px dashed #8090a0"></div><span>Palena · 4 comunas · <strong>Acceso muy limitado</strong></span></div>
+    `,
+    src: 'Fuente: BCN / INE · Límites provinciales esquemáticos (referencia)',
+    show:[lyrProvs], hide:[lyrComunas,lyrInfra,lyrVacio],
+    fly:{c:[-41.9,-72.9],z:7}
+  },
+  {
+    title: 'Las 30 comunas del proyecto',
+    desc: 'El diagnóstico se construye <strong>a nivel comunal</strong>. Los datos de permisos de edificación (DOM) de cada municipio son la base para estimar la generación de RCD. <strong>Solo Llanquihue tiene datos DOM en análisis.</strong> Las otras 3 provincias están pendientes.',
+    legend: `
+      <div class="leg-row"><div class="lcirc" style="background:#1456a0;border:2px solid #fff;box-shadow:0 0 0 1.5px #1456a0"></div><span>Comunas Llanquihue (datos DOM en análisis)</span></div>
+      <div class="leg-row"><div class="lcirc" style="background:#b01828;border:2px solid #fff;box-shadow:0 0 0 1.5px #b01828"></div><span>Comunas Osorno (pendiente DOM)</span></div>
+      <div class="leg-row"><div class="lcirc" style="background:#c07a00;border:2px solid #fff;box-shadow:0 0 0 1.5px #c07a00"></div><span>Comunas Chiloé (pendiente DOM)</span></div>
+      <div class="leg-row"><div class="lcirc" style="background:#8090a0;border:2px solid #fff;box-shadow:0 0 0 1.5px #8090a0"></div><span>Comunas Palena (pendiente DOM)</span></div>
+      <div class="lnote">⚠ Centroides aproximados · Límites oficiales: BCN / IDE Chile</div>
+    `,
+    src: 'Haz clic en cualquier punto para ver el nombre de la comuna',
+    show:[lyrProvs,lyrComunas], hide:[lyrInfra,lyrVacio],
+    fly:{c:[-41.9,-72.9],z:7}
+  },
+  {
+    title: 'Infraestructura de residuos existente',
+    desc: 'La región tiene una sola instalación de escala provincial: el <strong>CTI La Laja</strong> (Puerto Varas). Gestiona residuos domiciliarios (RSD), <strong>no RCD</strong>. Los vertederos de Osorno y Chiloé están saturados o en proceso de cierre.',
+    legend: `
+      <div class="leg-row"><div class="lcirc" style="background:#1a7a48;border:2px solid #fff;box-shadow:0 0 0 2px #1a7a48"></div><span><strong>CTI La Laja</strong> · Puerto Varas · RSD (no RCD)</span></div>
+      <div class="leg-row"><div class="lcirc" style="background:#b01828;border:2px solid #fff;box-shadow:0 0 0 2px #b01828"></div><span><strong>Vertedero Curaco</strong> · Osorno · Saturado</span></div>
+      <div class="leg-row"><div class="lcirc" style="background:#c07a00;border:2px solid #fff;box-shadow:0 0 0 2px #c07a00"></div><span><strong>Vertedero Ancud</strong> (Puntra El Roble) · Orden judicial cierre</span></div>
+      <div class="lnote">Haz clic en cada instalación para ver más detalles</div>
+    `,
+    src: 'Fuentes: SMA · SUBDERE · Asoc. Municipalidades · BioBioChile 2021–2023',
+    show:[lyrProvs,lyrComunas,lyrInfra], hide:[lyrVacio],
+    fly:{c:[-41.9,-72.9],z:7}
+  },
+  {
+    title: 'El vacío: 0 sitios RCD autorizados en la región',
+    desc: 'Ninguna provincia cuenta con sitios autorizados de <strong>disposición, transferencia o valorización de RCD</strong>. Para resolverlo, el proyecto necesita identificar y habilitar estos sitios coordinando con <strong>MINSAL, SEREMI de Salud</strong> y otras contrapartes que tienen el registro oficial de sitios y gestores autorizados.',
+    legend: `
+      <div class="leg-row" style="padding:8px 12px;background:#fef2f2;border-radius:5px;border-left:3px solid #d94000;margin-bottom:4px"><span style="font-size:12px;font-weight:600;color:#d94000">Sin sitios de disposición RCD</span></div>
+      <div class="leg-row" style="padding:8px 12px;background:#fef2f2;border-radius:5px;border-left:3px solid #d94000;margin-bottom:4px"><span style="font-size:12px;font-weight:600;color:#d94000">Sin plantas de valorización RCD</span></div>
+      <div class="leg-row" style="padding:8px 12px;background:#fef2f2;border-radius:5px;border-left:3px solid #d94000;margin-bottom:8px"><span style="font-size:12px;font-weight:600;color:#d94000">Sin estaciones de transferencia RCD</span></div>
+      <div class="leg-row" style="padding:8px 12px;background:#e8f4fb;border-radius:5px;border-left:3px solid #1456a0"><span style="font-size:11.5px;color:#1456a0;font-weight:600">Próximo paso: coordinar con MINSAL / SEREMI de Salud Los Lagos para acceder al registro de sitios y gestores RCD autorizados (Registro IRAR)</span></div>
+    `,
+    src: 'Este es el problema central que el proyecto busca resolver junto a la SEREMI MMA Los Lagos',
+    show:[lyrProvs,lyrComunas,lyrInfra,lyrVacio], hide:[],
+    fly:{c:[-41.9,-72.9],z:7}
+  }
+];
+
+// ── LÓGICA ─────────────────────────────────────────────────────
+let cur = 0;
+
+function render(i){
+  const s = STEPS[i];
+
+  // Actualizar dots
+  document.querySelectorAll('.sdot').forEach((d,j)=>{
+    d.classList.remove('active','done');
+    if(j<i) d.classList.add('done');
+    if(j===i) d.classList.add('active');
+  });
+  document.getElementById('step-label').textContent = `Paso ${i+1} de ${STEPS.length}`;
+
+  // Título y contenido con fade
+  const bd = document.getElementById('step-body');
+  bd.style.opacity='0';
+  bd.style.transform='translateY(6px)';
+
+  setTimeout(()=>{
+    document.getElementById('step-title').textContent = s.title;
+    document.getElementById('step-desc').innerHTML = s.desc;
+    document.getElementById('step-legend').innerHTML = s.legend;
+    const src = document.getElementById('step-src');
+    if(s.src){ src.textContent=s.src; src.style.display='block'; }
+    else src.style.display='none';
+
+    bd.style.transition='opacity .35s ease, transform .35s ease';
+    bd.style.opacity='1';
+    bd.style.transform='translateY(0)';
+  },160);
+
+  // Capas
+  s.hide.forEach(l=>{ if(map.hasLayer(l)) map.removeLayer(l); });
+  s.show.forEach(l=>{ if(!map.hasLayer(l)) l.addTo(map); });
+
+  // Volar
+  map.flyTo(s.fly.c, s.fly.z, {duration:0.9});
+
+  // Botones
+  document.getElementById('btn-prev').disabled = i===0;
+  const bn = document.getElementById('btn-next');
+  if(i===STEPS.length-1){
+    bn.textContent='↺ Ver desde el inicio';
+    bn.className='btn-n btn-r';
+    bn.onclick=()=>goTo(0);
+  } else {
+    bn.textContent='Siguiente →';
+    bn.className='btn-n';
+    bn.onclick=next;
+  }
+}
+
+function next(){ if(cur<STEPS.length-1){ cur++; render(cur); } }
+function prev(){ if(cur>0){ cur--; render(cur); } }
+function goTo(i){ cur=i; render(cur); }
+
+// Nota pie
+const nota = L.control({position:'bottomleft'});
+nota.onAdd=function(){
+  const d=L.DomUtil.create('div','nota-pie');
+  d.innerHTML='Límites provinciales <strong>esquemáticos</strong> · Centroides comunales <strong>aproximados</strong> · Proyecto Entorno más Circular (GEF) · Fundación Chile / MMA';
+  return d;
+};
+nota.addTo(map);
+
+render(0);
+</script>
+</body>
+</html>
